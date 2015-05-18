@@ -1,0 +1,7 @@
+[package]
+name = "pack_stream"
+version = "0.0.1"
+authors = ["Brian Underwood <ml+github@semi-sentient.com>"]
+
+[dependencies]
+rustc-serialize = "0.3"
