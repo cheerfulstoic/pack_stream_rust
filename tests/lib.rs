@@ -46,3 +46,30 @@ fn it_unpacks_tiny_ints() {
   }
 
 }
+
+#[test]
+fn it_unpacks_tiny_text() {
+  let bytes = vec![0x85];
+
+  match pack_stream::unpack(bytes).unwrap() {
+    Value::TinyText(i) => {
+      match i {
+        Ok(v) => assert_eq!("", v),
+        Err(e) => panic!("TinyInt was not empty! {}", e),
+      }
+    },
+    _ => panic!("Value not TinyInt"),
+  }
+
+  let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
+
+  match pack_stream::unpack(bytes).unwrap() {
+    Value::TinyText(i) => {
+      match i {
+        Ok(v) => assert_eq!("Hello", v),
+        Err(e) => panic!("TinyInt was empty! {}", e),
+      }
+    },
+    _ => panic!("Value not TinyInt"),
+  }
+}
