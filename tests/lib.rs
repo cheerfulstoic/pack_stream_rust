@@ -55,7 +55,7 @@ fn it_unpacks_tiny_text() {
     Value::TinyText(i) => {
       match i {
         Ok(v) => assert_eq!("", v),
-        Err(e) => panic!("TinyInt was not empty! {}", e),
+        Err(_e) => panic!("TinyInt was not empty!"),
       }
     },
     _ => panic!("Value not TinyInt"),
@@ -67,7 +67,7 @@ fn it_unpacks_tiny_text() {
     Value::TinyText(i) => {
       match i {
         Ok(v) => assert_eq!("Hello", v),
-        Err(e) => panic!("TinyInt was empty! {}", e),
+        Err(_e) => panic!("TinyInt was empty!"),
       }
     },
     _ => panic!("Value not TinyInt"),
