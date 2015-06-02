@@ -55,10 +55,10 @@ fn it_unpacks_tiny_text() {
     Value::TinyText(i) => {
       match i {
         Ok(v) => assert_eq!("", v),
-        Err(_e) => panic!("TinyInt was not empty!"),
+        Err(_e) => panic!("TinyText was not empty!"),
       }
     },
-    _ => panic!("Value not TinyInt"),
+    _ => panic!("Value not TinyText"),
   }
 
   let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
@@ -67,9 +67,9 @@ fn it_unpacks_tiny_text() {
     Value::TinyText(i) => {
       match i {
         Ok(v) => assert_eq!("Hello", v),
-        Err(_e) => panic!("TinyInt was empty!"),
+        Err(_e) => panic!("TinyText was empty!"),
       }
     },
-    _ => panic!("Value not TinyInt"),
+    _ => panic!("Value not TinyText"),
   }
 }
