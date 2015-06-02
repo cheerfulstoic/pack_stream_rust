@@ -48,8 +48,8 @@ fn it_unpacks_tiny_ints() {
 }
 
 #[test]
-fn it_unpacks_tiny_text() {
-  let bytes = vec![0x85];
+fn it_unpacks_empty_tiny_text() {
+  let bytes = vec![0x80];
 
   match pack_stream::unpack(bytes).unwrap() {
     Value::TinyText(i) => {
@@ -60,7 +60,10 @@ fn it_unpacks_tiny_text() {
     },
     _ => panic!("Value not TinyText"),
   }
+}
 
+#[test]
+fn it_unpacks_populated_tiny_text() {
   let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
 
   match pack_stream::unpack(bytes).unwrap() {
@@ -73,3 +76,4 @@ fn it_unpacks_tiny_text() {
     _ => panic!("Value not TinyText"),
   }
 }
+
