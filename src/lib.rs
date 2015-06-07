@@ -24,7 +24,6 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 		}
 	};
 
-	println!("return vec {:?}", return_vec);
 	return_vec
 }
 
