@@ -51,33 +51,54 @@ fn it_unpacks_tiny_ints() {
 	}
 }
 
-// #[test]
-// fn it_unpacks_empty_tiny_text() {
-//   let bytes = vec![0x80];
+#[test]
+fn it_unpacks_empty_tiny_text() {
+  let bytes = vec![0x80];
+  for i in pack_stream::unpack_stream(bytes) {
+  	match i {
+	  	Value::TinyText(val) => {
+	  		match val {
+	  			Ok(v) => assert_eq!("", v),
+	  			Err(_) => panic!("TT was not empty")
+	  		}
+	  	},
+	  	_ => panic!("Was not TT")
+  	}
+  }
+}
 
-//   match pack_stream::unpack(bytes)[0] {
-//     Value::TinyText(i) => {
-//       match i {
-//         Ok(v) => assert_eq!("", v),
-//         Err(_e) => panic!("TinyText was not empty!"),
-//       }
-//     },
-//     _ => panic!("Value not TinyText"),
-//   }
-// }
+#[test]
+fn it_unpacks_populated_tiny_text() {
+  let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
+  for i in pack_stream::unpack_stream(bytes) {
+  	match i {
+	  	Value::TinyText(val) => {
+	  		match val {
+	  			Ok(v) => assert_eq!("Hello", v),
+	  			Err(_) => panic!("TT was not empty")
+	  		}
+	  	},
+	  	_ => panic!("Was not TT")
+  	}
+  }
+}
 
-// #[test]
-// fn it_unpacks_populated_tiny_text() {
-//   let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F];
-
-//   match pack_stream::unpack(bytes).unwrap() {
-//     Value::TinyText(i) => {
-//       match i {
-//         Ok(v) => assert_eq!("Hello", v),
-//         Err(_e) => panic!("TinyText was empty!"),
-//       }
-//     },
-//     _ => panic!("Value not TinyText"),
-//   }
-// }
-
+#[test]
+fn it_unpacks_multiple_tiny_text_objects() {
+	let bytes = vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x85, 0x48, 0x66, 0x6C, 0x6C, 0x70];
+	for i in pack_stream::unpack_stream(bytes) {
+	  	match i {
+	  		Value::TinyText(val) => {
+	  			match val {
+	  				Ok(v) => {
+	  					if v == "Hello" || v == "Hfllp" {
+	  						()
+	  					};
+	  				},
+	  				Err(_) => panic!("tt did not contain value")
+	  			}
+	  		},
+		  	_ => panic!("Was not TT")
+	  	}
+	}
+}
