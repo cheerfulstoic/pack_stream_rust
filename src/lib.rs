@@ -21,7 +21,7 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	while let Some(byte) = bytes_iter.next() {
 		let result = unpack(byte, &mut bytes_iter);
 		match result {
-			Some(good_value) => {
+			Some((good_value, thing)) => {
 				match good_value {
 					Value::Index(len) => {
 						let content_slice = &stream[i + 1..(i + len)];
@@ -43,20 +43,20 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	return_vec
 }
 
-pub fn unpack(header_byte: &u8, _bytes_iter: &Iter<u8>) -> Option<Value> {
+pub fn unpack(header_byte: &u8, _bytes_iter: &Iter<u8>) -> Option<(Value, usize)> {
 	match *header_byte {
 		//0xC0u8 => None,
-		0xC2u8 => Some(Value::Boolean(false)),
-		0xC3u8 => Some(Value::Boolean(true)),
+		0xC2u8 => Some((Value::Boolean(false), 0)),
+		0xC3u8 => Some((Value::Boolean(true), 0)),
 
 		// TinyInt
-		0u8...0x7Fu8 => Some(Value::TinyInt(*header_byte)),
+		0u8...0x7Fu8 => Some((Value::TinyInt(*header_byte), 0)),
 
 		// TinyText
-		0x80u8 => Some(Value::TinyText(Ok(String::new()))),
+		0x80u8 => Some((Value::TinyText(Ok(String::new())), 0)),
 		0x81u8...0x8Fu8 => {
 			let len = bytes_ulimit(*header_byte, 0x80u8);
-			Some(Value::Index(len))
+			Some((Value::Index(len), len))
 		},
 
 		_ => None
