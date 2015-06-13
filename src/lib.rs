@@ -35,7 +35,7 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 						movement = len;
 						let to_return = match unpacked_obj {
 											Value::TinyText(_val) => {
-												let result = read_tiny_text(Vec::from(content_slice));
+												let result = unpack_string_or_error(Vec::from(content_slice));
 												Value::TinyText(result)
 											},
 											Value::String(_val) => {
@@ -44,7 +44,7 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 												i += 2;
 												let content_slice = &stream[i..(i + len as usize)];
 												movement = 1 + len as usize;
-												Value::String(read_tiny_text(Vec::from(content_slice)))
+												Value::String(unpack_string_or_error(Vec::from(content_slice)))
 											},
 											Value::Float64(_val) => {
 												let result = content_slice.read_f64::<BigEndian>().unwrap();
@@ -115,7 +115,7 @@ pub fn unpack(header_byte: &u8) -> Option<(Value, usize)> {
 	}
 }
 
-fn read_tiny_text(bytes: Vec<u8>) -> Result<String, UnpackError> {
+fn unpack_string_or_error(bytes: Vec<u8>) -> Result<String, UnpackError> {
 	match String::from_utf8(bytes) {
 		Ok(v) => Ok(v),
 		_ => Err(UnpackError::UnreadableBytes)
