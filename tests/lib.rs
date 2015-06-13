@@ -186,3 +186,37 @@ fn it_unpacks_i64() {
 		}
 	}
 }
+
+#[test]
+fn it_unpacks_positive_f64() {
+	let bytes = vec![0xC1, 0x3F, 0xF1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Float64(val) => {
+				match val {
+					Ok(v) => assert_eq!(1.1, v),
+					Err(e) => panic!("Not 1.1, {:?}", e)
+				}
+			},
+			_ => panic!("Not f64")
+		}
+	}
+}
+
+#[test]
+fn it_unpacks_negative_f64() {
+	let bytes = vec![0xC1, 0xBF, 0xF1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Float64(val) => {
+				match val {
+					Ok(v) => assert_eq!(-1.1, v),
+					Err(e) => panic!("Not 1.1, {:?}", e)
+				}
+			},
+			_ => panic!("Not f64")
+		}
+	}
+}

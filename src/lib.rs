@@ -1,7 +1,6 @@
 extern crate rustc_serialize;
 extern crate byteorder;
 // extern crate slice;
-use std::slice::{Iter};
 // use std::io::{Read, Bytes};
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -14,6 +13,7 @@ pub enum Value {
 	Int16(Result<i16, UnpackError>),
 	Int32(Result<i32, UnpackError>),
 	Int64(Result<i64, UnpackError>),
+	Float64(Result<f64, UnpackError>),
 }
 
 #[derive(Debug)]
@@ -23,9 +23,8 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	let mut bytes_iter = stream.iter();
 	let mut return_vec: Vec<Value> = vec![];
 	let mut i: usize = 0;
-	// let header_byte = bytes_iter.next();
 	while let Some(byte) = bytes_iter.next() {
-		let result = unpack(byte, &mut bytes_iter);
+		let result = unpack(byte);
 		match result {
 			Some((unpacked_obj, len)) => {
 				match len > 0 {
@@ -36,6 +35,10 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 												let result = read_tiny_text(Vec::from(content_slice));
 												Value::TinyText(result)
 											},
+											Value::Float64(_val) => {
+												let result = content_slice.read_f64::<BigEndian>().unwrap();
+												Value::Float64(Ok(result))
+											}
 											Value::Int8(_val) => {
 												let result = content_slice.read_i8().unwrap();
 												Value::Int8(Ok(result))
@@ -70,9 +73,11 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	return_vec
 }
 
-pub fn unpack(header_byte: &u8, _bytes_iter: &Iter<u8>) -> Option<(Value, usize)> {
+pub fn unpack(header_byte: &u8) -> Option<(Value, usize)> {
 	match *header_byte {
 		//0xC0u8 => None,
+		0xC1u8 => Some((Value::Float64(Err(UnpackError::UnreadableBytes)), 9)),
+
 		0xC2u8 => Some((Value::Boolean(false), 0)),
 		0xC3u8 => Some((Value::Boolean(true), 0)),
 
