@@ -9,6 +9,7 @@ pub enum Value {
 	Boolean(bool),
 	TinyInt(u8),
 	TinyText(Result<String, UnpackError>),
+	String(Result<String, UnpackError>),
 	Int8(Result<i8, UnpackError>),
 	Int16(Result<i16, UnpackError>),
 	Int32(Result<i32, UnpackError>),
@@ -23,6 +24,7 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	let mut bytes_iter = stream.iter();
 	let mut return_vec: Vec<Value> = vec![];
 	let mut i: usize = 0;
+	let mut movement: usize = 0;
 	while let Some(byte) = bytes_iter.next() {
 		let result = unpack(byte);
 		match result {
@@ -30,10 +32,19 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 				match len > 0 {
 					true => {
 						let mut content_slice = &stream[i + 1..(i + len)];
+						movement = len;
 						let to_return = match unpacked_obj {
 											Value::TinyText(_val) => {
 												let result = read_tiny_text(Vec::from(content_slice));
 												Value::TinyText(result)
+											},
+											Value::String(_val) => {
+												bytes_iter.next();
+												let len = content_slice[0];
+												i += 2;
+												let content_slice = &stream[i..(i + len as usize)];
+												movement = 1 + len as usize;
+												Value::String(read_tiny_text(Vec::from(content_slice)))
 											},
 											Value::Float64(_val) => {
 												let result = content_slice.read_f64::<BigEndian>().unwrap();
@@ -61,8 +72,8 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 					},
 					false => return_vec.push(unpacked_obj)
 				};
-				if bytes_iter.len() > 0 {
-					for _ in 0..len - 1 { bytes_iter.next(); }
+				if bytes_iter.len() as usize > 0 {
+					for _ in 0..movement - 1 { bytes_iter.next(); }
 				}
 				i = bytes_iter.len();
 			},
@@ -85,6 +96,10 @@ pub fn unpack(header_byte: &u8) -> Option<(Value, usize)> {
 		0xC9u8 => Some((Value::Int16(Err(UnpackError::UnreadableBytes)), 3)),
 		0xCAu8 => Some((Value::Int32(Err(UnpackError::UnreadableBytes)), 5)),
 		0xCBu8 => Some((Value::Int64(Err(UnpackError::UnreadableBytes)), 9)),
+
+		0xD0u8...0xD2u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
+		// 0xD1u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
+		// 0xD2u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
 
 		// TinyInt
 		0u8...0x7Fu8 => Some((Value::TinyInt(*header_byte), 0)),

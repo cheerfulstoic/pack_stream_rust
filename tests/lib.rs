@@ -103,21 +103,21 @@ fn it_unpacks_multiple_tiny_text_objects() {
 	}
 }
 
-// #[test]
-// fn it_unpacks_floats() {
-// 	let bytes = vec![0xC1, 0x3F, 0xF1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A];
-// 	for i in pack_stream::unpack_stream(bytes) {
-// 		match i {
-// 			Value::Float64(val) => {
-// 				match val {
-// 					Ok(v) => assert_eq!(1.1, v),
-// 					Err(_) => panic!("Didn't happen")
-// 				}
-// 			},
-// 			_ => panic!("Really didn't happen")
-// 		}
-// 	}
-// }
+#[test]
+fn it_unpacks_floats() {
+	let bytes = vec![0xC1, 0x3F, 0xF1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A];
+	for i in pack_stream::unpack_stream(bytes) {
+		match i {
+			Value::Float64(val) => {
+				match val {
+					Ok(v) => assert_eq!(1.1, v),
+					Err(_) => panic!("Didn't happen")
+				}
+			},
+			_ => panic!("Really didn't happen")
+		}
+	}
+}
 
 #[test]
 fn it_unpacks_i8() {
@@ -218,5 +218,37 @@ fn it_unpacks_negative_f64() {
 			},
 			_ => panic!("Not f64")
 		}
+	}
+}
+
+#[test]
+fn it_unpacks_strings() {
+	let bytes = vec![0xD0, 0x1A, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A,
+						 0x6B, 0x6C, 0x6D, 0x6F, 0x6E, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76,
+						 0x77, 0x78, 0x79, 0x7A];
+    for i in pack_stream::unpack_stream(bytes) {
+	  	match i {
+		  	Value::String(val) => {
+		  		match val {
+		  			Ok(v) => assert_eq!("abcdefghijklmonpqrstuvwxyz", v),
+		  			Err(_) => panic!("Did not match a thru z")
+		  		}
+		  	},
+		  	_ => panic!("Was not TT")
+	  	}
+	};
+
+	let bytes = vec![0xD0, 0x18, 0x45, 0x6E, 0x20, 0xC3, 0xA5, 0x20, 0x66, 0x6C, 0xC3, 0xB6,
+					 0x74, 0x20, 0xC3, 0xB6, 0x76, 0x65, 0x72, 0x20, 0xC3, 0xA4, 0x6E, 0x67, 0x65, 0x6E];
+    for i in pack_stream::unpack_stream(bytes) {
+	  	match i {
+		  	Value::String(val) => {
+		  		match val {
+		  			Ok(v) => assert_eq!("En å flöt över ängen", v),
+		  			Err(_) => panic!("Did not match Swedish phrase")
+		  		}
+		  	},
+		  	_ => panic!("Was not string")
+	  	}
 	}
 }
