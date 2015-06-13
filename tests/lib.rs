@@ -102,3 +102,87 @@ fn it_unpacks_multiple_tiny_text_objects() {
 	  	}
 	}
 }
+
+// #[test]
+// fn it_unpacks_floats() {
+// 	let bytes = vec![0xC1, 0x3F, 0xF1, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9A];
+// 	for i in pack_stream::unpack_stream(bytes) {
+// 		match i {
+// 			Value::Float64(val) => {
+// 				match val {
+// 					Ok(v) => assert_eq!(1.1, v),
+// 					Err(_) => panic!("Didn't happen")
+// 				}
+// 			},
+// 			_ => panic!("Really didn't happen")
+// 		}
+// 	}
+// }
+
+#[test]
+fn it_unpacks_i8() {
+	let bytes = vec![0xC8, 0x2A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Int8(val) => {
+				match val {
+					Ok(v) => assert_eq!(42, v),
+					Err(_) => panic!("Not 42")
+				}
+			},
+			_ => panic!("Not i8")
+		}
+	}
+}
+
+#[test]
+fn it_unpacks_i16() {
+	let bytes = vec![0xC9, 0x00, 0x2A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Int16(val) => {
+				match val {
+					Ok(v) => assert_eq!(42, v),
+					Err(_) => panic!("Not 42")
+				}
+			},
+			_ => panic!("Not i16")
+		}
+	}
+}
+
+#[test]
+fn it_unpacks_i32() {
+	let bytes = vec![0xCA, 0x00, 0x00, 0x00, 0x2A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Int32(val) => {
+				match val {
+					Ok(v) => assert_eq!(42, v),
+					Err(_) => panic!("Not 42")
+				}
+			},
+			_ => panic!("Not i32")
+		}
+	}
+}
+
+#[test]
+fn it_unpacks_i64() {
+	let bytes = vec![0xCB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A];
+	let results = pack_stream::unpack_stream(bytes);
+	for i in results {
+		match i {
+			Value::Int64(val) => {
+				match val {
+					Ok(v) => assert_eq!(42, v),
+					Err(e) => panic!("Not 42, {:?}", e)
+				}
+			},
+			_ => panic!("Not i32")
+		}
+	}
+}

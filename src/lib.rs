@@ -1,13 +1,19 @@
 extern crate rustc_serialize;
+extern crate byteorder;
 // extern crate slice;
 use std::slice::{Iter};
+// use std::io::{Read, Bytes};
+use byteorder::{BigEndian, ReadBytesExt};
 
 #[derive(Debug)]
 pub enum Value {
 	Boolean(bool),
 	TinyInt(u8),
 	TinyText(Result<String, UnpackError>),
-	Index(usize)
+	Int8(Result<i8, UnpackError>),
+	Int16(Result<i16, UnpackError>),
+	Int32(Result<i32, UnpackError>),
+	Int64(Result<i64, UnpackError>),
 }
 
 #[derive(Debug)]
@@ -21,23 +27,44 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 	while let Some(byte) = bytes_iter.next() {
 		let result = unpack(byte, &mut bytes_iter);
 		match result {
-			Some((good_value, thing)) => {
-				match good_value {
-					Value::Index(len) => {
-						let content_slice = &stream[i + 1..(i + len)];
-						// Consume n values
-						for _step in 0..len - 1 { bytes_iter.next(); };
-						i = bytes_iter.len();
-
-						// Read the data
-						let result = read_tiny_text(Vec::from(content_slice));
-						return_vec.push(Value::TinyText(result))
+			Some((unpacked_obj, len)) => {
+				match len > 0 {
+					true => {
+						let mut content_slice = &stream[i + 1..(i + len)];
+						let to_return = match unpacked_obj {
+											Value::TinyText(_val) => {
+												let result = read_tiny_text(Vec::from(content_slice));
+												Value::TinyText(result)
+											},
+											Value::Int8(_val) => {
+												let result = content_slice.read_i8().unwrap();
+												Value::Int8(Ok(result))
+											},
+											Value::Int16(_val) => {
+												let result = content_slice.read_i16::<BigEndian>().unwrap();
+												Value::Int16(Ok(result))
+											},
+											Value::Int32(_val) => {
+												let result = content_slice.read_i32::<BigEndian>().unwrap();
+												Value::Int32(Ok(result))
+											},
+											Value::Int64(_val) => {
+												let result = content_slice.read_i64::<BigEndian>().unwrap();
+												Value::Int64(Ok(result))
+											},
+											_ => unpacked_obj
+										};
+						return_vec.push(to_return);
 					},
-					_ => return_vec.push(good_value)
+					false => return_vec.push(unpacked_obj)
+				};
+				if bytes_iter.len() > 0 {
+					for _ in 0..len - 1 { bytes_iter.next(); }
 				}
+				i = bytes_iter.len();
 			},
 			None => ()
-		}
+		};
 	};
 
 	return_vec
@@ -49,6 +76,11 @@ pub fn unpack(header_byte: &u8, _bytes_iter: &Iter<u8>) -> Option<(Value, usize)
 		0xC2u8 => Some((Value::Boolean(false), 0)),
 		0xC3u8 => Some((Value::Boolean(true), 0)),
 
+		0xC8u8 => Some((Value::Int8(Err(UnpackError::UnreadableBytes)), 2)),
+		0xC9u8 => Some((Value::Int16(Err(UnpackError::UnreadableBytes)), 3)),
+		0xCAu8 => Some((Value::Int32(Err(UnpackError::UnreadableBytes)), 5)),
+		0xCBu8 => Some((Value::Int64(Err(UnpackError::UnreadableBytes)), 9)),
+
 		// TinyInt
 		0u8...0x7Fu8 => Some((Value::TinyInt(*header_byte), 0)),
 
@@ -56,7 +88,7 @@ pub fn unpack(header_byte: &u8, _bytes_iter: &Iter<u8>) -> Option<(Value, usize)
 		0x80u8 => Some((Value::TinyText(Ok(String::new())), 0)),
 		0x81u8...0x8Fu8 => {
 			let len = bytes_ulimit(*header_byte, 0x80u8);
-			Some((Value::Index(len), len))
+			Some((Value::TinyText(Err(UnpackError::UnreadableBytes)), len))
 		},
 
 		_ => None
