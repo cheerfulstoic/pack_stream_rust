@@ -1,8 +1,9 @@
 extern crate rustc_serialize;
 extern crate byteorder;
 // extern crate slice;
-// use std::io::{Read, Bytes};
+use std::io::{Read, Bytes};
 use byteorder::{BigEndian, ReadBytesExt};
+use std::slice::{Iter};
 
 #[derive(Debug)]
 pub enum Value {
@@ -20,19 +21,38 @@ pub enum Value {
 #[derive(Debug)]
 pub enum UnpackError { UnreadableBytes }
 
+pub struct Decoder {
+	stream: Vec<u8>,
+	return_vec: Vec<Value>,
+	i: usize,
+	movement: usize
+}
+
+impl Decoder {
+	fn new(stream: Vec<u8>) -> Decoder {
+		Decoder {
+			stream: stream,
+			return_vec: vec![],
+			i: 0,
+			movement: 0
+		}
+	}
+}
+
 pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
-	let mut bytes_iter = stream.iter();
-	let mut return_vec: Vec<Value> = vec![];
-	let mut i: usize = 0;
-	let mut movement: usize = 0;
+	let mut d = Decoder::new(stream);
+	let mut bytes_iter = d.stream.iter();
+	// let mut return_vec: Vec<Value> = vec![];
+	// let mut i: usize = 0;
+	// let mut movement: usize = 0;
 	while let Some(byte) = bytes_iter.next() {
 		let result = unpack(byte);
 		match result {
 			Some((unpacked_obj, len)) => {
 				match len > 0 {
 					true => {
-						let mut content_slice = &stream[i + 1..(i + len)];
-						movement = len;
+						let mut content_slice = &d.stream[d.i + 1..(d.i + len)];
+						d.movement = len;
 						let to_return = match unpacked_obj {
 											Value::TinyText(_val) => {
 												let result = unpack_string_or_error(Vec::from(content_slice));
@@ -41,9 +61,9 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 											Value::String(_val) => {
 												bytes_iter.next();
 												let len = content_slice[0];
-												i += 2;
-												let content_slice = &stream[i..(i + len as usize)];
-												movement = 1 + len as usize;
+												d.i += 2;
+												let content_slice = &d.stream[d.i..(d.i + len as usize)];
+												d.movement = 1 + len as usize;
 												Value::String(unpack_string_or_error(Vec::from(content_slice)))
 											},
 											Value::Float64(_val) => {
@@ -68,20 +88,20 @@ pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
 											},
 											_ => unpacked_obj
 										};
-						return_vec.push(to_return);
+						d.return_vec.push(to_return);
 					},
-					false => return_vec.push(unpacked_obj)
+					false => d.return_vec.push(unpacked_obj)
 				};
 				if bytes_iter.len() as usize > 0 {
-					for _ in 0..movement - 1 { bytes_iter.next(); }
+					for _ in 0..d.movement - 1 { bytes_iter.next(); }
 				}
-				i = bytes_iter.len();
+				d.i = bytes_iter.len();
 			},
 			None => ()
 		};
 	};
 
-	return_vec
+	d.return_vec
 }
 
 pub fn unpack(header_byte: &u8) -> Option<(Value, usize)> {
