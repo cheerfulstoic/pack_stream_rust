@@ -1,9 +1,7 @@
 extern crate rustc_serialize;
 extern crate byteorder;
 // extern crate slice;
-use std::io::{Read, Bytes};
 use byteorder::{BigEndian, ReadBytesExt};
-use std::slice::{Iter};
 
 #[derive(Debug)]
 pub enum Value {
@@ -16,133 +14,135 @@ pub enum Value {
 	Int32(Result<i32, UnpackError>),
 	Int64(Result<i64, UnpackError>),
 	Float64(Result<f64, UnpackError>),
+	Unreadable
 }
 
 #[derive(Debug)]
 pub enum UnpackError { UnreadableBytes }
 
 pub struct Decoder {
-	stream: Vec<u8>,
-	return_vec: Vec<Value>,
-	i: usize,
-	movement: usize
+	pub stream: Vec<u8>,
+	pub buffer: Vec<Value>,
 }
 
 impl Decoder {
-	fn new(stream: Vec<u8>) -> Decoder {
+	pub fn new(stream: Vec<u8>) -> Decoder {
 		Decoder {
 			stream: stream,
-			return_vec: vec![],
-			i: 0,
-			movement: 0
+			buffer: vec![],
 		}
 	}
-}
 
-pub fn unpack_stream(stream: Vec<u8>) -> Vec<Value> {
-	let mut d = Decoder::new(stream);
-	let mut bytes_iter = d.stream.iter();
-	// let mut return_vec: Vec<Value> = vec![];
-	// let mut i: usize = 0;
-	// let mut movement: usize = 0;
-	while let Some(byte) = bytes_iter.next() {
-		let result = unpack(byte);
-		match result {
-			Some((unpacked_obj, len)) => {
-				match len > 0 {
-					true => {
-						let mut content_slice = &d.stream[d.i + 1..(d.i + len)];
-						d.movement = len;
-						let to_return = match unpacked_obj {
-											Value::TinyText(_val) => {
-												let result = unpack_string_or_error(Vec::from(content_slice));
-												Value::TinyText(result)
-											},
-											Value::String(_val) => {
-												bytes_iter.next();
-												let len = content_slice[0];
-												d.i += 2;
-												let content_slice = &d.stream[d.i..(d.i + len as usize)];
-												d.movement = 1 + len as usize;
-												Value::String(unpack_string_or_error(Vec::from(content_slice)))
-											},
-											Value::Float64(_val) => {
-												let result = content_slice.read_f64::<BigEndian>().unwrap();
-												Value::Float64(Ok(result))
-											}
-											Value::Int8(_val) => {
-												let result = content_slice.read_i8().unwrap();
-												Value::Int8(Ok(result))
-											},
-											Value::Int16(_val) => {
-												let result = content_slice.read_i16::<BigEndian>().unwrap();
-												Value::Int16(Ok(result))
-											},
-											Value::Int32(_val) => {
-												let result = content_slice.read_i32::<BigEndian>().unwrap();
-												Value::Int32(Ok(result))
-											},
-											Value::Int64(_val) => {
-												let result = content_slice.read_i64::<BigEndian>().unwrap();
-												Value::Int64(Ok(result))
-											},
-											_ => unpacked_obj
-										};
-						d.return_vec.push(to_return);
-					},
-					false => d.return_vec.push(unpacked_obj)
-				};
-				if bytes_iter.len() as usize > 0 {
-					for _ in 0..d.movement - 1 { bytes_iter.next(); }
+	fn consume(&mut self, i: usize) {
+		for _ in 0..i { &self.next(); };
+	}
+
+	pub fn unpack_all(&mut self) -> &Vec<Value> {
+		while self.stream.len() > 0 { self.unpack_next(); };
+		&self.buffer
+	}
+
+	pub fn unpack_next(&mut self) -> &Vec<Value> {
+		let header_option = self.next();
+		let packed_details = match header_option {
+			Some(header_byte) => {
+				match header_byte {
+					0u8...0x7Fu8 => Value::TinyInt(header_byte),
+					0x80u8...0x8Fu8 => self.unpack_tiny_text(header_byte),
+					0xC1u8 => self.unpack_float64(),
+					0xC2u8 => Value::Boolean(false),
+					0xC3u8 => Value::Boolean(true),
+					0xC8u8 => self.unpack_int8(),
+					0xC9u8 => self.unpack_int16(),
+					0xCAu8 => self.unpack_int32(),
+					0xCBu8 => self.unpack_int64(),
+					0xD0u8...0xD2u8 => self.unpack_string(),
+					_ => Value::Unreadable
 				}
-				d.i = bytes_iter.len();
 			},
-			None => ()
+			_ => Value::Unreadable
 		};
-	};
+		self.buffer.push(packed_details);
+		&self.buffer
+	}
 
-	d.return_vec
-}
+	fn unpack_float64(&mut self) -> Value {
+		let result = {
+			let mut slice = &self.stream[0..8];
+			&slice.read_f64::<BigEndian>().unwrap()
+		};
+		self.consume(8);
+		Value::Float64(Ok(*result))
+	}
 
-pub fn unpack(header_byte: &u8) -> Option<(Value, usize)> {
-	match *header_byte {
-		//0xC0u8 => None,
-		0xC1u8 => Some((Value::Float64(Err(UnpackError::UnreadableBytes)), 9)),
+	fn unpack_int8(&mut self) -> Value {
+		let result = {
+			let mut slice = &self.stream[0..1];
+			&slice.read_i8().unwrap()
+		};
+		self.consume(1);
+		Value::Int8(Ok(*result))
+	}
 
-		0xC2u8 => Some((Value::Boolean(false), 0)),
-		0xC3u8 => Some((Value::Boolean(true), 0)),
+	fn unpack_int16(&mut self) -> Value {
+		let result = {
+			let mut slice = &self.stream[0..2];
+			&slice.read_i16::<BigEndian>().unwrap()
+		};
+		self.consume(2);
+		Value::Int16(Ok(*result))
+	}
 
-		0xC8u8 => Some((Value::Int8(Err(UnpackError::UnreadableBytes)), 2)),
-		0xC9u8 => Some((Value::Int16(Err(UnpackError::UnreadableBytes)), 3)),
-		0xCAu8 => Some((Value::Int32(Err(UnpackError::UnreadableBytes)), 5)),
-		0xCBu8 => Some((Value::Int64(Err(UnpackError::UnreadableBytes)), 9)),
+	fn unpack_int32(&mut self) -> Value {
+		let result = {
+			let mut slice = &self.stream[0..4];
+			&slice.read_i32::<BigEndian>().unwrap()
+		};
+		self.consume(4);
+		Value::Int32(Ok(*result))
+	}
 
-		0xD0u8...0xD2u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
-		// 0xD1u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
-		// 0xD2u8 => Some((Value::String(Err(UnpackError::UnreadableBytes)), 2)),
+	fn unpack_int64(&mut self) -> Value {
+		let result = {
+			let mut slice = &self.stream[0..8];
+			&slice.read_i64::<BigEndian>().unwrap()
+		};
+		self.consume(8);
+		Value::Int64(Ok(*result))
+	}
 
-		// TinyInt
-		0u8...0x7Fu8 => Some((Value::TinyInt(*header_byte), 0)),
+	fn unpack_tiny_text(&mut self, header_byte: u8) -> Value {
+		let i = (header_byte - 0x80u8) as usize;
+		let result = {
+			let bytes = &self.stream[0..i];
+			let byte_vec = Vec::from(bytes);
+			match String::from_utf8(byte_vec) {
+				Ok(val) => Ok(val),
+				_ => Err(UnpackError::UnreadableBytes)
+			}
+		};
+		self.consume(i);
+		Value::TinyText(result)
+	}
 
-		// TinyText
-		0x80u8 => Some((Value::TinyText(Ok(String::new())), 0)),
-		0x81u8...0x8Fu8 => {
-			let len = bytes_ulimit(*header_byte, 0x80u8);
-			Some((Value::TinyText(Err(UnpackError::UnreadableBytes)), len))
-		},
-
-		_ => None
+	fn unpack_string(&mut self) -> Value {
+		let i = self.next().unwrap() as usize;
+		let result = {
+			let bytes = &self.stream[0..i];
+			let byte_vec = Vec::from(bytes);
+			match String::from_utf8(byte_vec) {
+				Ok(val) => Ok(val),
+				_ => Err(UnpackError::UnreadableBytes)
+			}
+		};
+		self.consume(i);
+		Value::String(result)
 	}
 }
 
-fn unpack_string_or_error(bytes: Vec<u8>) -> Result<String, UnpackError> {
-	match String::from_utf8(bytes) {
-		Ok(v) => Ok(v),
-		_ => Err(UnpackError::UnreadableBytes)
+impl Iterator for Decoder {
+	type Item = u8;
+	fn next(&mut self) -> Option<u8> {
+		Some(self.stream.remove(0))
 	}
-}
-
-fn bytes_ulimit(header_byte: u8, offset: u8) -> usize {
-	let bytes_to_read = header_byte - offset;
-	(bytes_to_read + 1) as usize
 }
