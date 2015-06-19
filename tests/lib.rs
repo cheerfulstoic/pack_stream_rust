@@ -238,3 +238,81 @@ fn struct_unpacks_strings() {
 	  	}
 	}
 }
+
+#[test]
+fn struct_unpacks_tiny_list() {
+	// TODO: This is not enough. This is a list of other packstream-encoded objects. It needs to return a vec of PackStream::Value enums.
+	let bytes = vec![0x90u8];
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	for i in decoder.buffer {
+		match i {
+			Value::TinyList(content) => {
+				match content {
+					Ok(val) => {
+						match val.len() == 0 {
+							true => (),
+							false => panic!("It contained... {}", val.len())
+						}
+					},
+					Err(e) => panic!("{:?}", e)
+				}
+			},
+			_ => panic!("Was not list")
+		}
+	}
+
+
+	let bytes = vec![0x93u8, 0x01u8, 0x02u8, 0x03u8];
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	for i in decoder.buffer {
+		match i {
+			Value::TinyList(content) => {
+				match content {
+					Ok(val) => {
+						match val.len() == 3 {
+							true => {
+								let mut i = 1;
+								for subval in val {
+									match subval {
+										Value::TinyInt(n) => assert_eq!(i, n),
+										_ => panic!("Was not a TinyInt")
+									};
+									i += 1;
+								}
+							},
+							false => panic!("It contained... {}", val.len())
+						}
+					},
+					Err(e) => panic!("{:?}", e)
+				}
+			},
+			_ => panic!("Was not list")
+		}
+	}
+}
+
+#[test]
+fn struct_unpacks_lists() {
+	let bytes = vec![0xD4, 0x14, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00];
+	let len = &bytes.len();
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	for i in decoder.buffer {
+		match i {
+			Value::List(content) => {
+				match content {
+					Ok(val) => {
+						match val.len() == len - 2 {
+							true => assert_eq!(vec![1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0], val),
+							false => panic!("List contained {:?}", val)
+						}
+					},
+					Err(e) => panic!("List err was {:?}", e)
+				}
+			},
+			_ => panic!("Not list")
+		}
+	}
+}

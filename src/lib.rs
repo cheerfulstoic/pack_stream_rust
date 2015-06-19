@@ -1,7 +1,7 @@
 extern crate rustc_serialize;
 extern crate byteorder;
 // extern crate slice;
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, Error};
 
 #[derive(Debug)]
 pub enum Value {
@@ -9,6 +9,8 @@ pub enum Value {
 	TinyInt(u8),
 	TinyText(Result<String, UnpackError>),
 	String(Result<String, UnpackError>),
+	TinyList(Result<Vec<Value>, UnpackError>),
+	List(Result<Vec<u8>, UnpackError>),
 	Int8(Result<i8, UnpackError>),
 	Int16(Result<i16, UnpackError>),
 	Int32(Result<i32, UnpackError>),
@@ -47,8 +49,12 @@ impl Decoder {
 		let packed_details = match header_option {
 			Some(header_byte) => {
 				match header_byte {
-					0u8...0x7Fu8 => Value::TinyInt(header_byte),
+					0x00u8...0x7Fu8 => Value::TinyInt(header_byte),
 					0x80u8...0x8Fu8 => self.unpack_tiny_text(header_byte),
+					0x90u8...0x9Fu8 => self.unpack_tiny_list(header_byte),
+					// 0xA0u8...0xAFu8 => {
+						// self.unpack_tiny_map
+					// },
 					0xC1u8 => self.unpack_float64(),
 					0xC2u8 => Value::Boolean(false),
 					0xC3u8 => Value::Boolean(true),
@@ -56,7 +62,31 @@ impl Decoder {
 					0xC9u8 => self.unpack_int16(),
 					0xCAu8 => self.unpack_int32(),
 					0xCBu8 => self.unpack_int64(),
-					0xD0u8...0xD2u8 => self.unpack_string(),
+					0xD0u8 => {
+						let len = &self.content_len(1, "u8");
+						self.unpack_string(len)
+					},
+					0xD1u8 => {
+						let len = &self.content_len(3, "u16");
+						self.unpack_string(len)
+					},
+					0xD3u8 => {
+						let len = &self.content_len(7, "u32");
+						self.unpack_string(len)
+					},
+					0xD4u8 => {
+						let len = &self.content_len(1, "u8");
+						self.unpack_list(len)
+					},
+					0xD5u8 => {
+						let len = &self.content_len(3, "u16");
+						self.unpack_list(len)
+					},
+					0xD6u8 => {
+						let len = &self.content_len(7, "u32");
+						self.unpack_list(len)
+					},
+
 					_ => Value::Unreadable
 				}
 			},
@@ -64,6 +94,28 @@ impl Decoder {
 		};
 		self.buffer.push(packed_details);
 		&self.buffer
+	}
+
+	fn unpack_tiny_list(&mut self, header_byte: u8) -> Value {
+		let i = (header_byte - 0x90u8) as usize;
+		let result = {
+			let list_slice = Vec::from(&self.stream[0..i]);
+			let mut slice_decoder = Decoder::new(list_slice);
+			slice_decoder.unpack_all();
+			slice_decoder.buffer
+			// decoded
+		};
+		self.consume(i);
+		Value::TinyList(Ok(result))
+	}
+
+	fn unpack_list(&mut self, list_length: &usize) -> Value {
+		let result = {
+			let slice = &self.stream[0..*list_length];
+			Vec::from(slice)
+		};
+		&self.consume(*list_length);
+		Value::List(Ok(result))
 	}
 
 	fn unpack_float64(&mut self) -> Value {
@@ -125,18 +177,50 @@ impl Decoder {
 		Value::TinyText(result)
 	}
 
-	fn unpack_string(&mut self) -> Value {
-		let i = self.next().unwrap() as usize;
+	// TODO: I think this needs to read the length value after marker
+	fn unpack_string(&mut self, list_length: &usize) -> Value {
 		let result = {
-			let bytes = &self.stream[0..i];
-			let byte_vec = Vec::from(bytes);
-			match String::from_utf8(byte_vec) {
+			let slice = &self.stream[0..*list_length];
+			let vec = Vec::from(slice);
+			match String::from_utf8(vec) {
 				Ok(val) => Ok(val),
 				_ => Err(UnpackError::UnreadableBytes)
 			}
 		};
-		self.consume(i);
+		&self.consume(*list_length);
 		Value::String(result)
+	}
+
+	fn content_len(&mut self, size: usize, read_as: &str) -> usize {
+		let list_length_usize = {
+			let mut list_length_slice: &[u8] = &self.stream[0..size];
+			match read_as {
+				"u8" => {
+					let read_result: Result<u8, Error> = list_length_slice.read_u8();
+					match read_result {
+						Ok(val) => val as usize,
+						Err(_) => 0
+					}
+				},
+				"u16" => {
+					let read_result: Result<u16, Error> = list_length_slice.read_u16::<BigEndian>();
+					match read_result {
+						Ok(val) => val as usize,
+						Err(_) => 0
+					}
+				},
+				"u32" => {
+					let read_result: Result<u32, Error> = list_length_slice.read_u32::<BigEndian>();
+					match read_result {
+						Ok(val) => val as usize,
+						Err(_) => 0
+					}
+				},
+				_ => 0
+			}
+		};
+		&self.consume(size);
+		list_length_usize
 	}
 }
 
