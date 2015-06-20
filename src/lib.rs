@@ -2,20 +2,24 @@ extern crate rustc_serialize;
 extern crate byteorder;
 // extern crate slice;
 use byteorder::{BigEndian, ReadBytesExt, Error};
+use std::collections::{HashMap};
+
+pub type PackStreamResult<T> = Result<T, UnpackError>;
 
 #[derive(Debug)]
 pub enum Value {
 	Boolean(bool),
 	TinyInt(u8),
-	TinyText(Result<String, UnpackError>),
-	String(Result<String, UnpackError>),
-	TinyList(Result<Vec<Value>, UnpackError>),
-	List(Result<Vec<u8>, UnpackError>),
-	Int8(Result<i8, UnpackError>),
-	Int16(Result<i16, UnpackError>),
-	Int32(Result<i32, UnpackError>),
-	Int64(Result<i64, UnpackError>),
-	Float64(Result<f64, UnpackError>),
+	TinyText(String),
+	String(String),
+	TinyList(Vec<Value>),
+	TinyMap(Vec<(Value, Value)>),
+	List(Vec<Value>),
+	Int8(i8),
+	Int16(i16),
+	Int32(i32),
+	Int64(i64),
+	Float64(f64),
 	Unreadable
 }
 
@@ -49,15 +53,13 @@ impl Decoder {
 		let packed_details = match header_option {
 			Some(header_byte) => {
 				match header_byte {
-					0x00u8...0x7Fu8 => Value::TinyInt(header_byte),
+					0x00u8...0x7Fu8 => Ok(Value::TinyInt(header_byte)),
 					0x80u8...0x8Fu8 => self.unpack_tiny_text(header_byte),
 					0x90u8...0x9Fu8 => self.unpack_tiny_list(header_byte),
-					// 0xA0u8...0xAFu8 => {
-						// self.unpack_tiny_map
-					// },
+					0xA0u8...0xAFu8 => self.unpack_tiny_map(header_byte),
 					0xC1u8 => self.unpack_float64(),
-					0xC2u8 => Value::Boolean(false),
-					0xC3u8 => Value::Boolean(true),
+					0xC2u8 => Ok(Value::Boolean(false)),
+					0xC3u8 => Ok(Value::Boolean(true)),
 					0xC8u8 => self.unpack_int8(),
 					0xC9u8 => self.unpack_int16(),
 					0xCAu8 => self.unpack_int32(),
@@ -87,16 +89,39 @@ impl Decoder {
 						self.unpack_list(len)
 					},
 
-					_ => Value::Unreadable
+					_ => Err(UnpackError::UnreadableBytes)
 				}
 			},
-			_ => Value::Unreadable
+			_ => Err(UnpackError::UnreadableBytes)
 		};
-		self.buffer.push(packed_details);
+		// packed_details.wtffff();
+		match packed_details {
+			Ok(val) => self.buffer.push(val),
+			_ => ()
+		};
+		// self.buffer.push(packed_details);
 		&self.buffer
 	}
 
-	fn unpack_tiny_list(&mut self, header_byte: u8) -> Value {
+	fn unpack_tiny_map(&mut self, header_byte: u8) -> PackStreamResult<Value> {
+		let pairs = (header_byte - 0xA0u8) as usize;
+		let mut result_tuples: Vec<(Value, Value)> = vec![];
+		for _ in (0..pairs) {
+			let key = {
+				self.unpack_next();
+				self.buffer.pop().unwrap()
+			};
+			let value = {
+				self.unpack_next();
+				self.buffer.pop().unwrap()
+			};
+			result_tuples.push((key, value))
+		};
+		// self.consume(pairs);
+		Ok(Value::TinyMap(result_tuples))
+	}
+
+	fn unpack_tiny_list(&mut self, header_byte: u8) -> PackStreamResult<Value> {
 		let i = (header_byte - 0x90u8) as usize;
 		let result = {
 			let list_slice = Vec::from(&self.stream[0..i]);
@@ -106,64 +131,66 @@ impl Decoder {
 			// decoded
 		};
 		self.consume(i);
-		Value::TinyList(Ok(result))
+		Ok(Value::TinyList(result))
 	}
 
-	fn unpack_list(&mut self, list_length: &usize) -> Value {
+	fn unpack_list(&mut self, list_length: &usize) -> PackStreamResult<Value> {
 		let result = {
 			let slice = &self.stream[0..*list_length];
-			Vec::from(slice)
+			let mut slice_decoder = Decoder::new(Vec::from(slice));
+			slice_decoder.unpack_all();
+			slice_decoder.buffer
 		};
 		&self.consume(*list_length);
-		Value::List(Ok(result))
+		Ok(Value::List(result))
 	}
 
-	fn unpack_float64(&mut self) -> Value {
+	fn unpack_float64(&mut self) -> PackStreamResult<Value> {
 		let result = {
 			let mut slice = &self.stream[0..8];
 			&slice.read_f64::<BigEndian>().unwrap()
 		};
 		self.consume(8);
-		Value::Float64(Ok(*result))
+		Ok(Value::Float64(*result))
 	}
 
-	fn unpack_int8(&mut self) -> Value {
+	fn unpack_int8(&mut self) -> PackStreamResult<Value> {
 		let result = {
 			let mut slice = &self.stream[0..1];
 			&slice.read_i8().unwrap()
 		};
 		self.consume(1);
-		Value::Int8(Ok(*result))
+		Ok(Value::Int8(*result))
 	}
 
-	fn unpack_int16(&mut self) -> Value {
+	fn unpack_int16(&mut self) -> PackStreamResult<Value> {
 		let result = {
 			let mut slice = &self.stream[0..2];
 			&slice.read_i16::<BigEndian>().unwrap()
 		};
 		self.consume(2);
-		Value::Int16(Ok(*result))
+		Ok(Value::Int16(*result))
 	}
 
-	fn unpack_int32(&mut self) -> Value {
+	fn unpack_int32(&mut self) -> PackStreamResult<Value> {
 		let result = {
 			let mut slice = &self.stream[0..4];
 			&slice.read_i32::<BigEndian>().unwrap()
 		};
 		self.consume(4);
-		Value::Int32(Ok(*result))
+		Ok(Value::Int32(*result))
 	}
 
-	fn unpack_int64(&mut self) -> Value {
+	fn unpack_int64(&mut self) -> PackStreamResult<Value> {
 		let result = {
 			let mut slice = &self.stream[0..8];
 			&slice.read_i64::<BigEndian>().unwrap()
 		};
 		self.consume(8);
-		Value::Int64(Ok(*result))
+		Ok(Value::Int64(*result))
 	}
 
-	fn unpack_tiny_text(&mut self, header_byte: u8) -> Value {
+	fn unpack_tiny_text(&mut self, header_byte: u8) -> PackStreamResult<Value> {
 		let i = (header_byte - 0x80u8) as usize;
 		let result = {
 			let bytes = &self.stream[0..i];
@@ -174,11 +201,11 @@ impl Decoder {
 			}
 		};
 		self.consume(i);
-		Value::TinyText(result)
+		Ok(Value::TinyText(result.unwrap()))
 	}
 
 	// TODO: I think this needs to read the length value after marker
-	fn unpack_string(&mut self, list_length: &usize) -> Value {
+	fn unpack_string(&mut self, list_length: &usize) -> PackStreamResult<Value> {
 		let result = {
 			let slice = &self.stream[0..*list_length];
 			let vec = Vec::from(slice);
@@ -188,7 +215,7 @@ impl Decoder {
 			}
 		};
 		&self.consume(*list_length);
-		Value::String(result)
+		Ok(Value::String(result.unwrap()))
 	}
 
 	fn content_len(&mut self, size: usize, read_as: &str) -> usize {

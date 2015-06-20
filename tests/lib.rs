@@ -58,36 +58,26 @@ fn struct_unpacks_tiny_ints() {
 
 #[test]
 fn struct_unpacks_empty_tiny_text() {
-  let mut decoder = Decoder::new(vec![0x80]);
-  decoder.unpack_next();
-  for i in decoder.buffer {
-  	match i {
-	  	Value::TinyText(val) => {
-	  		match val {
-	  			Ok(v) => assert_eq!("", v),
-	  			Err(_) => panic!("TT was not empty")
-	  		}
-	  	},
-	  	_ => panic!("Was not TT")
-  	}
-  }
+	let mut decoder = Decoder::new(vec![0x80]);
+	decoder.unpack_next();
+	for i in decoder.buffer {
+		match i {
+			Value::TinyText(val) => assert_eq!("", val),
+			_ => panic!("Was not TT")
+		}
+	}
 }
 
 #[test]
 fn struct_unpacks_populated_tiny_text() {
-  let mut decoder = Decoder::new(vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F]);
-  decoder.unpack_next();
-  for i in decoder.buffer {
-  	match i {
-	  	Value::TinyText(val) => {
-	  		match val {
-	  			Ok(v) => assert_eq!("Hello", v),
-	  			Err(_) => panic!("TT was not empty")
-	  		}
-	  	},
-	  	_ => panic!("Was not TT")
-  	}
-  }
+	let mut decoder = Decoder::new(vec![0x85, 0x48, 0x65, 0x6C, 0x6C, 0x6F]);
+	decoder.unpack_next();
+	for i in decoder.buffer {
+		match i {
+		  	Value::TinyText(val) => assert_eq!("Hello", val),
+		  	_ => panic!("Was not TT")
+		}
+	}
 }
 
 #[test]
@@ -96,16 +86,7 @@ fn struct_unpacks_multiple_tiny_text_objects() {
 	decoder.unpack_all();
 	for i in decoder.buffer {
 	  	match i {
-	  		Value::TinyText(val) => {
-	  			match val {
-	  				Ok(v) => {
-	  					if v == "Hello" || v == "Hfllp" {
-	  						()
-	  					};
-	  				},
-	  				Err(_) => panic!("tt did not contain value")
-	  			}
-	  		},
+	  		Value::TinyText(val) => { if val == "Hello" || val == "Hfllp" { () }; },
 		  	_ => panic!("Was not TT")
 	  	}
 	}
@@ -118,12 +99,7 @@ fn struct_unpacks_i16() {
 	decoder.unpack_next();
 	for i in decoder.buffer {
 		match i {
-			Value::Int16(val) => {
-				match val {
-					Ok(v) => assert_eq!(42, v),
-					Err(_) => panic!("Not 42")
-				}
-			},
+			Value::Int16(val) => assert_eq!(42, val),
 			_ => panic!("Not i16")
 		}
 	}
@@ -136,12 +112,7 @@ fn struct_unpacks_i32() {
 	decoder.unpack_next();
 	for i in decoder.buffer {
 		match i {
-			Value::Int32(val) => {
-				match val {
-					Ok(v) => assert_eq!(42, v),
-					Err(_) => panic!("Not 42")
-				}
-			},
+			Value::Int32(val) => assert_eq!(42, val),
 			_ => panic!("Not i32")
 		}
 	}
@@ -154,12 +125,7 @@ fn struct_unpacks_i64() {
 	decoder.unpack_next();
 	for i in decoder.buffer {
 		match i {
-			Value::Int64(val) => {
-				match val {
-					Ok(v) => assert_eq!(42, v),
-					Err(e) => panic!("Not 42, {:?}", e)
-				}
-			},
+			Value::Int64(val) => assert_eq!(42, val),
 			_ => panic!("Not i64")
 		}
 	}
@@ -172,12 +138,7 @@ fn struct_unpacks_positive_f64() {
 	decoder.unpack_next();
 	for i in decoder.buffer {
 		match i {
-			Value::Float64(val) => {
-				match val {
-					Ok(v) => assert_eq!(1.1, v),
-					Err(e) => panic!("Not 1.1, {:?}", e)
-				}
-			},
+			Value::Float64(val) => assert_eq!(1.1, val),
 			_ => panic!("Not f64")
 		}
 	}
@@ -190,12 +151,7 @@ fn struct_unpacks_negative_f64() {
 	decoder.unpack_next();
 	for i in decoder.buffer {
 		match i {
-			Value::Float64(val) => {
-				match val {
-					Ok(v) => assert_eq!(-1.1, v),
-					Err(e) => panic!("Not 1.1, {:?}", e)
-				}
-			},
+			Value::Float64(val) => assert_eq!(-1.1, val),
 			_ => panic!("Not f64")
 		}
 	}
@@ -210,16 +166,10 @@ fn struct_unpacks_strings() {
 	decoder.unpack_all();
     for i in decoder.buffer {
 	  	match i {
-		  	Value::String(val) => {
-		  		match val {
-		  			Ok(v) => assert_eq!("abcdefghijklmonpqrstuvwxyz", v),
-		  			Err(_) => panic!("Did not match a thru z")
-		  		}
-		  	},
+		  	Value::String(val) => assert_eq!("abcdefghijklmonpqrstuvwxyz", val),
 		  	_ => panic!("Was not TT")
 	  	}
 	};
-
 
 	let bytes = vec![0xD0, 0x18, 0x45, 0x6E, 0x20, 0xC3, 0xA5, 0x20, 0x66, 0x6C, 0xC3, 0xB6,
 					 0x74, 0x20, 0xC3, 0xB6, 0x76, 0x65, 0x72, 0x20, 0xC3, 0xA4, 0x6E, 0x67, 0x65, 0x6E];
@@ -228,12 +178,7 @@ fn struct_unpacks_strings() {
 	decoder.unpack_all();
     for i in decoder.buffer {
 	  	match i {
-		  	Value::String(val) => {
-		  		match val {
-		  			Ok(v) => assert_eq!("En å flöt över ängen", v),
-		  			Err(_) => panic!("Did not match Swedish phrase")
-		  		}
-		  	},
+		  	Value::String(val) => assert_eq!("En å flöt över ängen", val),
 		  	_ => panic!("Was not string")
 	  	}
 	}
@@ -248,20 +193,14 @@ fn struct_unpacks_tiny_list() {
 	for i in decoder.buffer {
 		match i {
 			Value::TinyList(content) => {
-				match content {
-					Ok(val) => {
-						match val.len() == 0 {
-							true => (),
-							false => panic!("It contained... {}", val.len())
-						}
-					},
-					Err(e) => panic!("{:?}", e)
+				match content.len() == 0 {
+					true => (),
+					false => panic!("It contained... {}", content.len())
 				}
 			},
 			_ => panic!("Was not list")
 		}
 	}
-
 
 	let bytes = vec![0x93u8, 0x01u8, 0x02u8, 0x03u8];
 	let mut decoder = Decoder::new(bytes);
@@ -269,23 +208,18 @@ fn struct_unpacks_tiny_list() {
 	for i in decoder.buffer {
 		match i {
 			Value::TinyList(content) => {
-				match content {
-					Ok(val) => {
-						match val.len() == 3 {
-							true => {
-								let mut i = 1;
-								for subval in val {
-									match subval {
-										Value::TinyInt(n) => assert_eq!(i, n),
-										_ => panic!("Was not a TinyInt")
-									};
-									i += 1;
-								}
-							},
-							false => panic!("It contained... {}", val.len())
+				match content.len() == 3 {
+					true => {
+						let mut i = 1;
+						for subval in content {
+							match subval {
+								Value::TinyInt(n) => assert_eq!(i, n),
+								_ => panic!("Was not a TinyInt")
+							};
+							i += 1;
 						}
 					},
-					Err(e) => panic!("{:?}", e)
+					false => panic!("It contained... {}", content.len())
 				}
 			},
 			_ => panic!("Was not list")
@@ -296,23 +230,47 @@ fn struct_unpacks_tiny_list() {
 #[test]
 fn struct_unpacks_lists() {
 	let bytes = vec![0xD4, 0x14, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x00];
-	let len = &bytes.len();
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	let mut list_content: Vec<u8> = vec![];
+	for subvec in decoder.buffer {
+		match subvec {
+			Value::List(el) => {
+				for num in el {
+					match num {
+						Value::TinyInt(val) => list_content.push(val),
+						_ => panic!("List did not contain int")
+					};
+				};
+			},
+			_ => panic!("Was not a List")
+		}
+	};
+	assert_eq!(vec![1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0], list_content)
+}
+
+#[test]
+fn struct_unpacks_maps() {
+	let bytes = vec![0xA1u8, 0x81u8, 0x61u8, 0x01u8];
 	let mut decoder = Decoder::new(bytes);
 	decoder.unpack_all();
 	for i in decoder.buffer {
 		match i {
-			Value::List(content) => {
-				match content {
-					Ok(val) => {
-						match val.len() == len - 2 {
-							true => assert_eq!(vec![1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0], val),
-							false => panic!("List contained {:?}", val)
-						}
-					},
-					Err(e) => panic!("List err was {:?}", e)
-				}
+			Value::TinyMap(tuples_vec) => {
+				for pair in tuples_vec {
+					let (key, val) = pair;
+
+					match key {
+						Value::TinyText(k) => assert_eq!("a", k),
+						_ => println!("Key was not a string")
+					};
+					match val {
+						Value::TinyInt(v) => assert_eq!(1, v),
+						_ => println!("Val was not int")
+					}
+				};
 			},
-			_ => panic!("Not list")
+			_ => panic!("Was not a tiny map")
 		}
 	}
 }
