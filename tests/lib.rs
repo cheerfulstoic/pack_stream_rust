@@ -250,7 +250,7 @@ fn struct_unpacks_lists() {
 }
 
 #[test]
-fn struct_unpacks_maps() {
+fn struct_unpacks_tiny_maps() {
 	let bytes = vec![0xA1u8, 0x81u8, 0x61u8, 0x01u8];
 	let mut decoder = Decoder::new(bytes);
 	decoder.unpack_all();
@@ -270,6 +270,41 @@ fn struct_unpacks_maps() {
 					}
 				};
 			},
+			_ => panic!("Was not a tiny map")
+		}
+	}
+}
+
+#[test]
+fn struct_unpacks_maps() {
+	let bytes= vec![0xD8u8, 0x10u8, 0x81u8, 0x61u8, 0x01u8, 0x81u8, 0x62u8, 0x01u8, 0x81u8, 0x63u8, 0x03u8, 0x81u8, 0x64u8, 0x04u8, 0x81u8, 0x65u8, 0x05u8, 0x81u8, 0x66u8, 0x06u8, 0x81u8, 0x67u8, 0x07u8, 0x81u8, 0x68u8, 0x08u8, 0x81u8, 0x69u8, 0x09u8, 0x81u8, 0x6Au8, 0x00u8, 0x81u8, 0x6Bu8, 0x01u8, 0x81u8, 0x6Cu8, 0x02u8, 0x81u8, 0x6Du8, 0x03u8, 0x81u8, 0x6Eu8, 0x04u8, 0x81u8, 0x6Fu8, 0x05u8, 0x81u8, 0x70u8, 0x06u8];
+	let keys = vec!["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"];
+	let values = vec![1,1,3,4,5,6,7,8,9,0,1,2,3,4,5,6];
+	assert_eq!(keys.len(), values.len());
+
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	for i in decoder.buffer {
+		match i {
+			Value::Map(tuples) => {
+				let mut index = 0;
+
+				for pair in tuples {
+					let (key, val) = pair;
+
+					match key {
+						Value::TinyText(name) => assert_eq!(keys[index], name),
+						_ => println!("Key was not a string")
+					};
+
+					match val {
+						Value::TinyInt(value) => assert_eq!(values[index], value),
+						_ => println!("Val was not int")
+					};
+
+					index = index + 1;
+				}
+			}, 
 			_ => panic!("Was not a tiny map")
 		}
 	}
