@@ -15,6 +15,7 @@ pub enum Value {
 	TinyList(Vec<Value>),
 	TinyMap(Vec<(Value, Value)>),
 	List(Vec<Value>),
+	Map(Vec<(Value, Value)>),
 	Int8(i8),
 	Int16(i16),
 	Int32(i32),
@@ -88,6 +89,10 @@ impl Decoder {
 						let len = &self.content_len(7, "u32");
 						self.unpack_list(len)
 					},
+					0xD8u8 => {
+						let len = &self.content_len(1, "u8");
+						self.unpack_map(len)
+					},
 
 					_ => Err(UnpackError::UnreadableBytes)
 				}
@@ -105,8 +110,14 @@ impl Decoder {
 
 	fn unpack_tiny_map(&mut self, header_byte: u8) -> PackStreamResult<Value> {
 		let pairs = (header_byte - 0xA0u8) as usize;
+		let result_tuples = self.map_population(&pairs);
+		// self.consume(pairs);
+		Ok(Value::TinyMap(result_tuples))
+	}
+
+	fn map_population(&mut self, map_length: &usize) -> Vec<(Value, Value)> {
 		let mut result_tuples: Vec<(Value, Value)> = vec![];
-		for _ in (0..pairs) {
+		for _ in (0..*map_length) {
 			let key = {
 				self.unpack_next();
 				self.buffer.pop().unwrap()
@@ -117,8 +128,12 @@ impl Decoder {
 			};
 			result_tuples.push((key, value))
 		};
-		// self.consume(pairs);
-		Ok(Value::TinyMap(result_tuples))
+		result_tuples
+	}
+
+	fn unpack_map(&mut self, map_length: &usize) -> PackStreamResult<Value> {
+		let result_tuples = self.map_population(&map_length);
+		Ok(Value::Map(result_tuples))
 	}
 
 	fn unpack_tiny_list(&mut self, header_byte: u8) -> PackStreamResult<Value> {
