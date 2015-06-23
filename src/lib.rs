@@ -16,6 +16,7 @@ pub enum Value {
 	TinyMap(Vec<(Value, Value)>),
 	List(Vec<Value>),
 	Map(Vec<(Value, Value)>),
+	TinyStruct(PackStreamStruct),
 	Int8(i8),
 	Int16(i16),
 	Int32(i32),
@@ -26,6 +27,21 @@ pub enum Value {
 
 #[derive(Debug)]
 pub enum UnpackError { UnreadableBytes }
+
+#[derive(Debug)]
+pub struct PackStreamStruct {
+	pub sig: u8,
+	pub val: Box<Vec<Value>>
+}
+
+impl PackStreamStruct {
+	pub fn new(sig: u8, val: Box<Vec<Value>>) -> PackStreamStruct {
+		PackStreamStruct {
+			sig: sig,
+			val: val
+		}
+	}
+}
 
 pub struct Decoder {
 	pub stream: Vec<u8>,
@@ -58,6 +74,7 @@ impl Decoder {
 					0x80u8...0x8Fu8 => self.unpack_tiny_text(header_byte),
 					0x90u8...0x9Fu8 => self.unpack_tiny_list(header_byte),
 					0xA0u8...0xAFu8 => self.unpack_tiny_map(header_byte),
+					0xB0u8...0xBFu8 => self.unpack_tiny_struct(header_byte),
 					0xC1u8 => self.unpack_float64(),
 					0xC2u8 => Ok(Value::Boolean(false)),
 					0xC3u8 => Ok(Value::Boolean(true)),
@@ -101,26 +118,35 @@ impl Decoder {
 						let len = &self.content_len(7, "u32");
 						self.unpack_map(len)
 					},
-
-
 					_ => Err(UnpackError::UnreadableBytes)
 				}
 			},
 			_ => Err(UnpackError::UnreadableBytes)
 		};
-		// packed_details.wtffff();
 		match packed_details {
 			Ok(val) => self.buffer.push(val),
 			_ => ()
 		};
-		// self.buffer.push(packed_details);
 		&self.buffer
+	}
+
+	fn unpack_tiny_struct(&mut self, header_byte: u8) -> PackStreamResult<Value> {
+		let len = (header_byte - 0xB0u8) as usize;
+		let sig = self.next().unwrap();
+		let results = {
+			let mut struct_slice = &self.stream[0..len];
+			let mut struct_decoder = Decoder::new(Vec::from(struct_slice));
+			struct_decoder.unpack_all();
+			struct_decoder.buffer
+		};
+		let result_struct = PackStreamStruct::new(sig, Box::new(results));
+		self.consume(len);
+		Ok(Value::TinyStruct(result_struct))
 	}
 
 	fn unpack_tiny_map(&mut self, header_byte: u8) -> PackStreamResult<Value> {
 		let pairs = (header_byte - 0xA0u8) as usize;
 		let result_tuples = self.map_population(&pairs);
-		// self.consume(pairs);
 		Ok(Value::TinyMap(result_tuples))
 	}
 
@@ -152,7 +178,6 @@ impl Decoder {
 			let mut slice_decoder = Decoder::new(list_slice);
 			slice_decoder.unpack_all();
 			slice_decoder.buffer
-			// decoded
 		};
 		self.consume(i);
 		Ok(Value::TinyList(result))
