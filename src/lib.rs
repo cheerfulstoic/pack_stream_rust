@@ -93,6 +93,15 @@ impl Decoder {
 						let len = &self.content_len(1, "u8");
 						self.unpack_map(len)
 					},
+					0xD9u8 => {
+						let len = &self.content_len(3, "u16");
+						self.unpack_map(len)
+					},
+					0xDAu8 => {
+						let len = &self.content_len(7, "u32");
+						self.unpack_map(len)
+					},
+
 
 					_ => Err(UnpackError::UnreadableBytes)
 				}
