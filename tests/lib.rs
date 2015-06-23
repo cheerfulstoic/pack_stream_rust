@@ -304,8 +304,22 @@ fn struct_unpacks_maps() {
 
 					index = index + 1;
 				}
-			}, 
+			},
 			_ => panic!("Was not a tiny map")
+		}
+	}
+}
+
+#[test]
+fn struct_unpacks_tiny_struct() {
+	let bytes = vec![0xB3u8, 0x01u8, 0x01u8, 0x02u8, 0x03u8];
+	let mut decoder = Decoder::new(bytes);
+	decoder.unpack_all();
+	assert!(decoder.buffer.len() > 0);
+	for i in decoder.buffer {
+		match i {
+			Value::TinyStruct(s) => assert!(s.sig == 0x01u8),
+			_ => panic!("Was not tiny struct! {:?}", i)
 		}
 	}
 }
